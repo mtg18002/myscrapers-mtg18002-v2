@@ -36,10 +36,15 @@ READ_RETRY = gax_retry.Retry(
 storage_client = storage.Client()
 
 # -------------------- SIMPLE REGEX EXTRACTORS --------------------
+COLOR_LIBRARY = ["black", "white", "grey", "gray", "silver", "blue", "green", "orange", "brown", "red", "yellow", "purple", "pink", "gold", "beige", "maroon", "tan", "teal"]
+MAKE_LIBRARY = ["Toyota", "Honda", "BMW", "Subaru", "Ford", "Chevrolet", "Mazda", "Jeep", "Volkswagen", "VW", "Nissan", "Kia", "Hyundai", "Ram", "Dodge", "Audi", "Mercedes",
+               "Chevy", "Lexus", "GMC", "Chrysler", "Fiat", "Genesis", "Volvo", "Jaguar", "Buick", "Tesla"]
 PRICE_RE      = re.compile(r"\$\s?([0-9,]+)")
 YEAR_RE       = re.compile(r"\b(19|20)\d{2}\b")
-MAKE_MODEL_RE = re.compile(r"\b([A-Z][a-z]+)\s+([A-Z][A-Za-z0-9]+)")
-
+MAKE_MODEL_RE = re.compile(r"\b(" + "|".join(MAKES) + r")\s+([A-Za-z0-9\-]+(?:\s+[A-Za-z0-9\-]+)*)", re.I)
+CYLINDERS_RE = re.compile(r"(?:\b(\d{1,2})\s*[- ]?\s*(?:cyl|cylinders?)\b|\bcylinders?\s*[:\-]?\s*(\d{1,2})\b)", re.I)
+CONDITION_RE = re.compile(r"(?:condition[:\-]?\s*(\w+)|(\w+)\s+condition)", re.I)
+COLOR_RE = re.compile(r"(?:color[:\-]?\s*)?\b(" + "|".join(COLOR_LIBRARY) + r")\b",re.I)
 # -------------------- HELPERS --------------------
 def _list_run_ids(bucket: str, scrapes_prefix: str) -> list[str]:
     """
@@ -127,8 +132,8 @@ def parse_listing(text: str) -> dict:
 
     mm = MAKE_MODEL_RE.search(text)
     if mm:
-        d["make"] = mm.group(1)
-        d["model"] = mm.group(2)
+        d["make"] = mm.group(1).lower()
+        d["model"] = mm.group(2).lower().strip()
 
     # mileage variants
     mi = None
@@ -148,6 +153,23 @@ def parse_listing(text: str) -> dict:
             except ValueError: mi = None
     if mi is not None:
         d["mileage"] = mi
+
+    cyl = CYLINDERS_RE.search(text)
+    if cyl:
+        val = cyl.group(1) or cyl.group(2)
+        try:
+            d["cylinders"] = int(val)
+        except ValueError:
+            pass
+
+    cond = CONDITION_RE.search(text)
+    if cond:
+        val = cond.group(1) or cond.group(2)
+        d["condition"] = val.lower()
+
+    color = COLOR_RE.search(text)
+    if color:
+        d["color"] = color.group(1).lower()
 
     return d
 
