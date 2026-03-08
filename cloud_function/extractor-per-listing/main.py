@@ -41,9 +41,9 @@ MAKE_LIBRARY = ["Toyota", "Honda", "BMW", "Subaru", "Ford", "Chevrolet", "Mazda"
                "Chevy", "Lexus", "GMC", "Chrysler", "Fiat", "Genesis", "Volvo", "Jaguar", "Buick", "Tesla"]
 PRICE_RE      = re.compile(r"\$\s?([0-9,]+)")
 YEAR_RE       = re.compile(r"\b(19|20)\d{2}\b")
-MAKE_MODEL_RE = re.compile(r"\b(" + "|".join(MAKES) + r")\s+([A-Za-z0-9\-]+(?:\s+[A-Za-z0-9\-]+)*)", re.I)
+MAKE_MODEL_RE = re.compile(r"\b(" + "|".join(MAKE_LIBRARY) + r")\b\s+([^\n\r]+)", re.I)
 CYLINDERS_RE = re.compile(r"(?:\b(\d{1,2})\s*[- ]?\s*(?:cyl|cylinders?)\b|\bcylinders?\s*[:\-]?\s*(\d{1,2})\b)", re.I)
-CONDITION_RE = re.compile(r"(?:condition[:\-]?\s*(\w+)|(\w+)\s+condition)", re.I)
+CONDITION_RE = re.compile(r"condition[:\-]?\s*([^\n\r]+)", re.I)
 COLOR_RE = re.compile(r"(?:color[:\-]?\s*)?\b(" + "|".join(COLOR_LIBRARY) + r")\b",re.I)
 # -------------------- HELPERS --------------------
 def _list_run_ids(bucket: str, scrapes_prefix: str) -> list[str]:
@@ -133,7 +133,7 @@ def parse_listing(text: str) -> dict:
     mm = MAKE_MODEL_RE.search(text)
     if mm:
         d["make"] = mm.group(1).lower()
-        d["model"] = mm.group(2).lower().strip()
+        d["model"] = mm.group(2).strip().lower()
 
     # mileage variants
     mi = None
@@ -165,11 +165,11 @@ def parse_listing(text: str) -> dict:
     cond = CONDITION_RE.search(text)
     if cond:
         val = cond.group(1) or cond.group(2)
-        d["condition"] = val.lower()
+        d["condition"] = val.lower().strip()
 
     color = COLOR_RE.search(text)
     if color:
-        d["color"] = color.group(1).lower()
+        d["color"] = color.group(1).lower().strip()
 
     return d
 
