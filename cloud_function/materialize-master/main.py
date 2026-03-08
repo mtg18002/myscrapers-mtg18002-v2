@@ -27,7 +27,7 @@ RUN_ID_PLAIN_RE = re.compile(r"^\d{14}$")        # 20251026170002
 # Stable CSV schema for students
 CSV_COLUMNS = [
     "post_id", "run_id", "scraped_at",
-    "price", "year", "make", "model", "mileage",
+    "price", "year", "make", "model", "mileage", "cylinders", "color", "condition",
     "source_txt"
 ]
 
