@@ -41,7 +41,8 @@ MAKE_LIBRARY = ["Toyota", "Honda", "BMW", "Subaru", "Ford", "Chevrolet", "Mazda"
                "Chevy", "Lexus", "GMC", "Chrysler", "Fiat", "Genesis", "Volvo", "Jaguar", "Buick", "Tesla"]
 PRICE_RE      = re.compile(r"\$\s?([0-9,]+)")
 YEAR_RE       = re.compile(r"\b(19|20)\d{2}\b")
-MAKE_MODEL_RE = re.compile(r"\b(" + "|".join(MAKE_LIBRARY) + r")\b\s+([^\n\r]+)", re.I)
+STOP_RE = "|".join(re.escape(word) for word in STOP_WORDS)
+MAKE_MODEL_RE = re.compile(r"\b(" + "|".join(MAKE_LIBRARY) + r")\b\s+(.+?)(?=\s*(?:for sale|by owner|craigslist|\-|$))", re.I)
 CYLINDERS_RE = re.compile(r"(?:\b(\d{1,2})\s*[- ]?\s*(?:cyl|cylinders?)\b|\bcylinders?\s*[:\-]?\s*(\d{1,2})\b)", re.I)
 CONDITION_RE = re.compile(r"condition[:\-]?\s*([^\n\r]+)", re.I)
 COLOR_RE = re.compile(r"(?:color[:\-]?\s*)?\b(" + "|".join(COLOR_LIBRARY) + r")\b",re.I)
