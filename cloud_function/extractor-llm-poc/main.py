@@ -182,8 +182,8 @@ def _vertex_extract_fields(raw_text: str) -> dict:
         "Return a strict JSON object that conforms to the provided schema. "
         "If a value is not present, use null. "
         "Rules: integers for price/year/mileage/cylinders; price in USD; mileage in miles; "
-        "Extract vehicle condition only if explicitly stated in the text using standard terms, otherwise return null." 
-        "do not infer values not explicitly present; do not add extra keys."
+        "For cylinders, look for patterns like 'V6', 'V8', '6-cyl', '4 cyl', '4 cylinders', etc. "
+        "Use reasonable inference when commonly implied in car listings; only infer when highly likely, otherwise return null."
     )
 
     # FIX: Combine instruction and text into one prompt string (SDK compatibility)
