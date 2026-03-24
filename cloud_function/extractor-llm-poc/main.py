@@ -156,7 +156,7 @@ def _safe_int(x):
 # -------------------- VERTEX AI CALL --------------------
 def _vertex_extract_fields(raw_text: str) -> dict:
     """
-    Ask Gemini to return JSON with exactly: price, year, make, model, mileage, cylinders, color, condition
+    Ask Gemini to return JSON with exactly: price, year, make, model, mileage, cylinders, color, condition, transmission, fuel. 
     """
     model = _get_vertex_model()
 
@@ -172,8 +172,10 @@ def _vertex_extract_fields(raw_text: str) -> dict:
             "cylinders": {"type": "integer", "nullable": True},
             "color": {"type": "string", "nullable": True},
             "condition": {"type": "string", "nullable": True},
+            "transmission": {"type": "string", "nullable": True},
+            "fuel": {"type": "string", "nullable": True},
         },
-        "required": ["price", "year", "make", "model", "mileage", "cylinders", "color", "condition"]
+        "required": ["price", "year", "make", "model", "mileage", "cylinders", "color", "condition", "transmission", "fuel"]
     }
 
     # System instruction (will be prepended to the prompt)
@@ -183,6 +185,8 @@ def _vertex_extract_fields(raw_text: str) -> dict:
         "If a value is not present, use null. "
         "Rules: integers for price/year/mileage/cylinders; price in USD; mileage in miles; "
         "For cylinders, look for patterns like 'V6', 'V8', '6-cyl', '4 cyl', '4 cylinders', etc. "
+        "The transmission can be manual or automatic; if not listed, return null."
+        "Fuel can be gas, diesel, electric, or hybrid; if not listed, return null."
         "Use reasonable inference when commonly implied in car listings; only infer when highly likely, otherwise return null."
     )
 
@@ -325,6 +329,8 @@ def llm_extract_http(request: Request):
                 "cylinders": parsed.get("cylinders"),
                 "color": parsed.get("color"),
                 "condition": parsed.get("condition"),
+                "transmission": parsed.get("transmission"),
+                "fuel": parsed.get("fuel"),
                 "llm_provider": "vertex",
                 "llm_model": LLM_MODEL,
                 "llm_ts": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
