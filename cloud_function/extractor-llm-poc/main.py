@@ -174,8 +174,9 @@ def _vertex_extract_fields(raw_text: str) -> dict:
             "condition": {"type": "string", "nullable": True},
             "transmission": {"type": "string", "nullable": True},
             "fuel": {"type": "string", "nullable": True},
+            "title_status": {"type": "string", "nullable": True},
         },
-        "required": ["price", "year", "make", "model", "mileage", "cylinders", "color", "condition", "transmission", "fuel"]
+        "required": ["price", "year", "make", "model", "mileage", "cylinders", "color", "condition", "transmission", "fuel", "title_status"]
     }
 
     # System instruction (will be prepended to the prompt)
@@ -187,6 +188,7 @@ def _vertex_extract_fields(raw_text: str) -> dict:
         "For cylinders, look for patterns like 'V6', 'V8', '6-cyl', '4 cyl', '4 cylinders', etc. "
         "The transmission can be manual or automatic; if not listed, return null."
         "Fuel can be gas, diesel, electric, or hybrid; if not listed, return null."
+        "For title status, look for clean/clear, rebuilt, salvage, lien, non-repairable/junk. Otherwise, return null."
         "Use reasonable inference when commonly implied in car listings; only infer when highly likely, otherwise return null."
     )
 
@@ -331,6 +333,7 @@ def llm_extract_http(request: Request):
                 "condition": parsed.get("condition"),
                 "transmission": parsed.get("transmission"),
                 "fuel": parsed.get("fuel"),
+                "title_status": parsed.get("title_status"),
                 "llm_provider": "vertex",
                 "llm_model": LLM_MODEL,
                 "llm_ts": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
