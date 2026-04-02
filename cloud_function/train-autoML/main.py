@@ -140,7 +140,7 @@ def run_once(dry_run=False):
     base_path = f"/tmp/{timestamp}"
     os.makedirs(base_path, exist_ok=True)
 
-     metrics_df = pd.DataFrame([{
+    metrics_df = pd.DataFrame([{
         "timestamp": timestamp,
         "mae": mae_today,
         "rmse": rmse_today,
