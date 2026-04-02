@@ -51,6 +51,17 @@ def _append_csv_to_gcs(client, bucket, key, df_new):
 
     blob.upload_from_string(combined_df.to_csv(index=False), content_type="text/csv")
 
+def sanitize_dataframe_for_model(df, num_cols, cat_cols, train_df):
+    df_safe = df.copy()
+    df_safe[num_cols] = df_safe[num_cols].apply(pd.to_numeric, errors='coerce')
+    df_safe = df_safe.replace([np.inf, -np.inf], np.nan)
+    df_safe[num_cols] = df_safe[num_cols].fillna(train_df[num_cols].median())
+    for c in cat_cols:
+        df_safe[c] = df_safe[c].fillna(train_df[c].mode()[0])
+    df_safe = df_safe.loc[:, df_safe.nunique() > 1]
+
+    return df_safe
+
 # ---- MAIN FUNCTION ----
 def run_once(dry_run=False):
     client = storage.Client(project=PROJECT_ID)
@@ -155,11 +166,12 @@ def run_once(dry_run=False):
     preds_df.to_csv(preds_path, index=False)
 
     # --- Permutation Importance (ALL features) ---
+    X_h_safe = sanitize_dataframe_for_model(X_h, num_cols, cat_cols, train_df)
     best_model = pipe.named_steps['model'].fitted_pipeline_
-    result = permutation_importance(best_model, X_h, y_true, n_repeats=20, random_state=42, scoring="neg_mean_absolute_error")
+    result = permutation_importance(best_model, X_h_safe, y_true, n_repeats=20, random_state=42, scoring="neg_mean_absolute_error")
 
     perm_df = pd.DataFrame({
-        "feature": X_h.columns,
+        "feature": X_h_safe.columns,
         "importances_mean": result.importances_mean
     })
     perm_csv_path = f"{base_path}/perm_importance_{timestamp}.csv"
@@ -168,7 +180,7 @@ def run_once(dry_run=False):
     # Boxplot
     perm_idx_sorted = np.argsort(result.importances_mean)
     fig, ax = plt.subplots(figsize=(6, max(4, len(feats)*0.3)))
-    ax.boxplot(result.importances.T, vert=False, labels=X_h.columns)
+    ax.boxplot(result.importances.T, vert=False, labels=X_h_safe.columns)
     fig.suptitle("Permutation Importance (All Features)", y=1.05)
     fig.tight_layout()
     perm_plot_path = f"{base_path}/perm_importance_{timestamp}.png"
@@ -177,11 +189,11 @@ def run_once(dry_run=False):
 
     # --- PDPs for top 3 features ---
     top3_idx = np.argsort(result.importances_mean)[-3:]
-    top3_features = X_h.columns[top3_idx]
+    top3_features = X_h_safe.columns[top3_idx]
     pdp_paths = []
     for feat in top3_features:
         fig, ax = plt.subplots(figsize=(6, 4))
-        display = PartialDependenceDisplay.from_estimator(best_model, X_h, [feat], ax=ax)
+        display = PartialDependenceDisplay.from_estimator(best_model, X_h_safe, [feat], ax=ax)
         fig.tight_layout()
         pdp_path = f"{base_path}/pdp_{feat}_{timestamp}.png"
         fig.savefig(pdp_path)
