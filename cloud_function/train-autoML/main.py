@@ -95,7 +95,7 @@ def run_once(dry_run=False):
     ])
 
     # --- TPOT autoML ---
-    tpot = TPOTRegressor(generations=3, population_size=15, verbosity=2, random_state=42, max_time_mins=10)
+    tpot = TPOTRegressor(generations=3, population_size=15, random_state=42, max_time_mins=10)
     pipe = Pipeline([("pre", pre), ("model", tpot)])
 
     start = time.time()
