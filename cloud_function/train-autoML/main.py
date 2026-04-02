@@ -10,7 +10,7 @@ from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.impute import SimpleImputer
-from sklearn.metrics import mean_absolute_error
+from sklearn.metrics import mean_absolute_error, mean_squared_error
 from sklearn.inspection import permutation_importance, PartialDependenceDisplay
 from tpot import TPOTRegressor
 import joblib
@@ -19,7 +19,7 @@ import joblib
 PROJECT_ID     = os.getenv("PROJECT_ID", "")
 GCS_BUCKET     = os.getenv("GCS_BUCKET", "")
 DATA_KEY       = os.getenv("DATA_KEY", "structured/datasets/listings_master_llm.csv")
-OUTPUT_PREFIX  = os.getenv("OUTPUT_PREFIX", "preds")  # Base path in GCS
+OUTPUT_PREFIX  = os.getenv("OUTPUT_PREFIX", "preds-autoML")  # Base path in GCS
 TIMEZONE       = os.getenv("TIMEZONE", "America/New_York")
 LOG_LEVEL      = os.getenv("LOG_LEVEL", "INFO")
 
@@ -39,6 +39,17 @@ def _write_csv_to_gcs(client, bucket, key, df):
 def _clean_numeric(s):
     s = s.astype(str).str.replace(r"[^\d.]+", "", regex=True).str.strip()
     return pd.to_numeric(s, errors="coerce")
+
+def _append_csv_to_gcs(client, bucket, key, df_new):
+    blob = client.bucket(bucket).blob(key)
+
+    if blob.exists():
+        existing_df = pd.read_csv(io.BytesIO(blob.download_as_bytes()))
+        combined_df = pd.concat([existing_df, df_new], ignore_index=True)
+    else:
+        combined_df = df_new
+
+    blob.upload_from_string(combined_df.to_csv(index=False), content_type="text/csv")
 
 # ---- MAIN FUNCTION ----
 def run_once(dry_run=False):
@@ -105,6 +116,9 @@ def run_once(dry_run=False):
     # --- Holdout predictions ---
     preds_df = pd.DataFrame()
     mae_today = None
+    rmse_today = None
+    mape_today = None
+    bias_today = None
     if not holdout_df.empty:
         X_h = holdout_df[feats]
         y_true = holdout_df["price_num"]
@@ -117,19 +131,32 @@ def run_once(dry_run=False):
         mask = y_true.notna()
         if mask.any():
             mae_today = float(mean_absolute_error(y_true[mask], y_hat[mask]))
+            rmse_today = float(mean_squared_error(y_true[mask], y_hat[mask], squared=False))
+            mape_today = float(np.mean(np.abs((y_true[mask] - y_hat[mask]) / y_true[mask])) * 100)
+            bias_today = float(np.mean(y_hat[mask] - y_true[mask]))
 
     # --- Timestamp for saving outputs ---
     timestamp = pd.Timestamp.utcnow().strftime("%Y%m%d%H%M%S")
     base_path = f"/tmp/{timestamp}"
     os.makedirs(base_path, exist_ok=True)
 
+     metrics_df = pd.DataFrame([{
+        "timestamp": timestamp,
+        "mae": mae_today,
+        "rmse": rmse_today,
+        "mape": mape_today,
+        "bias": bias_today,
+        "n_train": len(train_df),
+        "n_holdout": len(holdout_df)
+    }])
+
     # --- Save predictions ---
     preds_path = f"{base_path}/preds_{timestamp}.csv"
     preds_df.to_csv(preds_path, index=False)
 
     # --- Permutation Importance (ALL features) ---
-    best_model = pipe.named_steps['model']
-    result = permutation_importance(best_model, X_h, y_true, n_repeats=20, random_state=42)
+    best_model = pipe.named_steps['model'].fitted_pipeline_
+    result = permutation_importance(best_model, X_h, y_true, n_repeats=20, random_state=42, scoring="neg_mean_absolute_error")
 
     perm_df = pd.DataFrame({
         "feature": X_h.columns,
@@ -168,9 +195,17 @@ def run_once(dry_run=False):
     # --- upload to GCS ---
     if not dry_run:
         gcs_base = f"{OUTPUT_PREFIX}/{timestamp}"
-        _write_csv_to_gcs(client, GCS_BUCKET, f"{gcs_base}/preds.csv", preds_df)
+        metrics_global_path = f"{OUTPUT_PREFIX}/metrics/model_accuracy.csv" 
+        _write_csv_to_gcs(client, GCS_BUCKET, f"{gcs_base}/preds_df.csv", preds_df)
         _write_csv_to_gcs(client, GCS_BUCKET, f"{gcs_base}/perm_importance.csv", perm_df)
-        # PDPs could also be uploaded as needed
+        perm_plot_blob = client.bucket(GCS_BUCKET).blob(f"{gcs_base}/perm_importance.png")
+        perm_plot_blob.upload_from_filename(perm_plot_path)
+        for pdp_path in pdp_paths:
+            blob_name = f"{gcs_base}/{os.path.basename(pdp_path)}"
+            client.bucket(GCS_BUCKET).blob(blob_name).upload_from_filename(pdp_path)
+        pipeline_blob = client.bucket(GCS_BUCKET).blob(f"{gcs_base}/tpot_pipeline_{timestamp}.joblib")
+        pipeline_blob.upload_from_filename(model_path)
+        _append_csv_to_gcs(client, GCS_BUCKET, metrics_global_path, metrics_df)
 
     return {
         "status": "ok",
