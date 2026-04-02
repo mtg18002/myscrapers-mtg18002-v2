@@ -10,7 +10,7 @@ from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.impute import SimpleImputer
-from sklearn.metrics import mean_absolute_error, mean_squared_error
+from sklearn.metrics import mean_absolute_error, mean_squared_error, root_mean_squared_error
 from sklearn.inspection import permutation_importance, PartialDependenceDisplay
 from tpot import TPOTRegressor
 import joblib
@@ -131,7 +131,7 @@ def run_once(dry_run=False):
         mask = y_true.notna()
         if mask.any():
             mae_today = float(mean_absolute_error(y_true[mask], y_hat[mask]))
-            rmse_today = float(mean_squared_error(y_true[mask], y_hat[mask], squared=False))
+            rmse_today = float(root_mean_squared_error(y_true[mask], y_hat[mask]))
             mape_today = float(np.mean(np.abs((y_true[mask] - y_hat[mask]) / y_true[mask])) * 100)
             bias_today = float(np.mean(y_hat[mask] - y_true[mask]))
 
