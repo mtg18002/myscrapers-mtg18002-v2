@@ -29,6 +29,7 @@ env:
   WORKLOAD_IDENTITY_PROVIDER: ${{ vars.WORKLOAD_IDENTITY_PROVIDER }}
   SCHEDULE_BODY: ${{ vars.TRAIN_AUTOML_BODY || '{"dry_run":true}' }}
   CRON_EXPR: "20 * * * *"  
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   deploy:
