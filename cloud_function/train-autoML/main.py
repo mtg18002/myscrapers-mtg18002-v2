@@ -74,6 +74,35 @@ def run_once(dry_run=False):
     df["mileage_num"]   = _clean_numeric(df["mileage"])
     df["cylinders_num"] = _clean_numeric(df["cylinders"])
 
+    # --- Drop features ---
+    df = df.drop(['color', 'model'], axis=1)
+
+    # --- Encoding Categorical Variables ---
+    cat_cols = ["make", "condition", "transmission", "fuel", "title_status"]
+    for c in cat_cols:
+        df[c] = df[c].astype(str).str.lower().str.strip()
+        
+    df['condition'] = df['condition'].map({"poor": 0,
+                                          "fair": 1,
+                                          "decent": 1, 
+                                          "used": 1,
+                                          "good": 2,
+                                          "excellent": 3,
+                                          "like new": 3})
+    df['transmission'] = df['transmission'].map({"manual": 0,
+                                                 "automatic": 1})
+    df['fuel'] = df['fuel'].map({"gas": 0,
+                                 "diesel": 1,
+                                 "hybrid": 2,
+                                 "electric": 3})
+    df['title_status'] = df['title_status'].map({"junk": 0,
+                                                 "non-repairable": 0,
+                                                 "salvage": 1,
+                                                 "rebuilt": 2,
+                                                 "lien": 3,
+                                                 "clean": 4, 
+                                                 "clear": 4})
+
     # --- Train / Holdout split (all data < today) ---
     unique_dates = sorted(df["date_local"].dropna().unique())
     if len(unique_dates) < 2:
@@ -89,7 +118,6 @@ def run_once(dry_run=False):
 
     # --- Features ---
     target = "price_num"
-    cat_cols = ["make", "model", "color", "condition", "transmission", "fuel", "title_status"]
     num_cols = ["year_num", "mileage_num", "cylinders_num"]
     feats = cat_cols + num_cols
 
@@ -98,11 +126,11 @@ def run_once(dry_run=False):
 
     # --- Preprocessing ---
     pre = ColumnTransformer([
-        ("num", SimpleImputer(strategy="median"), num_cols),
+        ("num", SimpleImputer(strategy="median"), num_cols + ["condition", "transmission", "fuel", "title_status"]),
         ("cat", Pipeline([
             ("imp", SimpleImputer(strategy="most_frequent")),
             ("oh", OneHotEncoder(handle_unknown="ignore"))
-        ]), cat_cols),
+        ]), ["make"]),
     ])
 
     # --- TPOT autoML ---
@@ -124,7 +152,7 @@ def run_once(dry_run=False):
         y_true = holdout_df["price_num"]
         y_hat = pipe.predict(X_h)
 
-        preds_df = holdout_df[["post_id", "scraped_at", "make", "model", "year", "mileage", "price"]].copy()
+        preds_df = holdout_df[["post_id", "scraped_at", "make", "year", "mileage", "condition", "transmission", "fuel", "title_status", "price"]].copy()
         preds_df["actual_price"] = y_true
         preds_df["pred_price"]   = np.round(y_hat, 2)
 
