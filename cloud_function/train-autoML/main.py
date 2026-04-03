@@ -111,6 +111,7 @@ def run_once(dry_run=False):
     today_local = unique_dates[-1]
     train_df   = df[df["date_local"] < today_local].copy()
     holdout_df = df[df["date_local"] == today_local].copy()
+    holdout_df = holdout_df[holdout_df["price_num"].notna()]
     train_df = train_df[train_df["price_num"].notna()]
 
     if len(train_df) < 40:
@@ -134,7 +135,7 @@ def run_once(dry_run=False):
     ])
 
     # --- TPOT autoML ---
-    tpot = TPOTRegressor(generations=3, population_size=15, random_state=42, max_time_mins=10)
+    tpot = TPOTRegressor(generations=1, population_size=20, random_state=42, max_time_mins=10)
     pipe = Pipeline([("pre", pre), ("model", tpot)])
 
     start = time.time()
@@ -152,7 +153,7 @@ def run_once(dry_run=False):
         y_true = holdout_df["price_num"]
         y_hat = pipe.predict(X_h)
 
-        preds_df = holdout_df[["post_id", "scraped_at", "make", "year", "mileage", "condition", "transmission", "fuel", "title_status", "price"]].copy()
+        preds_df = holdout_df[["post_id", "scraped_at", "make", "year", "mileage", "condition", "transmission", "fuel", "title_status"]].copy()
         preds_df["actual_price"] = y_true
         preds_df["pred_price"]   = np.round(y_hat, 2)
 
@@ -213,6 +214,9 @@ def run_once(dry_run=False):
     for feat in top3_features:
         fig, ax = plt.subplots(figsize=(6, 4))
         display = PartialDependenceDisplay.from_estimator(best_model, X_h_transformed_df, [feat], ax=ax)
+        plt.title(f'Partial Dependence Plot for {feat}')
+        plt.ylabel('Predicted Price')
+        plt.xlabel(feat)
         fig.tight_layout()
         pdp_path = f"{base_path}/pdp_{feat}_{timestamp}.png"
         fig.savefig(pdp_path)
