@@ -185,9 +185,9 @@ def run_once(dry_run=False):
     # --- Permutation Importance (ALL features) ---
     X_h_transformed = pipe.named_steps['pre'].transform(X_h)
     feature_names = pipe.named_steps['pre'].get_feature_names_out()
-    X_h_transformed_df = pd.DataFrame(X_h_transformed, columns=feature_names)
+    X_h_transformed_df = pd.DataFrame(X_h_transformed.toarray(), columns=feature_names)
     best_model = pipe.named_steps['model'].fitted_pipeline_
-    result = permutation_importance(best_model, X_h_transformed, y_true, n_repeats=20, random_state=42, scoring="neg_mean_absolute_error")
+    result = permutation_importance(best_model, X_h_transformed.toarray(), y_true, n_repeats=20, random_state=42, scoring="neg_mean_absolute_error")
 
     perm_df = pd.DataFrame({
         "feature": feature_names,
