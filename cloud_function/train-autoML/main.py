@@ -199,16 +199,20 @@ def run_once(dry_run=False):
         "feature": feature_names,
         "importances_mean": result.importances_mean
     })
+    perm_df = perm_df.sort_values(by="importances_mean", ascending=False).reset_index(drop=True)
     perm_csv_path = f"{base_path}/perm_importance_{timestamp}.csv"
     perm_df.to_csv(perm_csv_path, index=False)
 
-    # Boxplot
-    perm_idx_sorted = np.argsort(result.importances_mean)
-    fig, ax = plt.subplots(figsize=(6, max(4, len(feats)*0.3)))
-    ax.boxplot(result.importances.T, vert=False, labels=feature_names)
-    fig.suptitle("Permutation Importance (All Features)", y=1.05)
+    # Boxplot of Permutation Importance for Top 10 Features
+    top_idx = np.argsort(result.importances_mean)[::-1][:10]
+    top_features = np.array(feature_names)[top_idx]
+    top_importances = result.importances[top_idx]
+    fig, ax = plt.subplots(figsize=(6, max(4, len(top_features)*0.3)))
+    ax.boxplot(top_importances.T, vert=False, labels=top_features)
+    fig.suptitle("Permutation Importance (Top 10 Features)", y=1.05)
     fig.tight_layout()
-    perm_plot_path = f"{base_path}/perm_importance_{timestamp}.png"
+
+    perm_plot_path = f"{base_path}/perm_importance_{timestamp}_top10.png"
     fig.savefig(perm_plot_path)
     plt.close(fig)
 
