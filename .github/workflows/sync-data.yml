@@ -47,7 +47,7 @@ jobs:
           mkdir -p ${{ env.OUTPUT_DIR }}
           
           echo "Copying all files from gs://${BUCKET_NAME}/${GCS_PREDS_PREFIX}/ to local folder..."
-          gsutil -m cp -r gs://${BUCKET_NAME}/${GCS_PREDS_PREFIX} ${{ env.OUTPUT_DIR }}/
+          gsutil -m cp -r gs://${BUCKET_NAME}/${GCS_PREDS_PREFIX}/* ${{ env.OUTPUT_DIR }}/
           echo "Copy completed."
 
       # --- 3. COMMIT AND PUSH ---
