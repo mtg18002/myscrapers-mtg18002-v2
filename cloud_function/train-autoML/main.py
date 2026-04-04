@@ -124,8 +124,10 @@ def run_once(dry_run=False):
 
     X_train = train_df[feats]
     y_train = train_df[target]
+    X_holdout = holdout_df[feats]
+    y_holdout = holdout_df[target]
 
-    # --- Preprocessing ---
+    # --- Preprocessing --- --> OLD
     pre = ColumnTransformer([
         ("num", SimpleImputer(strategy="median"), num_cols + ["condition", "transmission", "fuel", "title_status"]),
         ("cat", Pipeline([
@@ -134,12 +136,16 @@ def run_once(dry_run=False):
         ]), ["make"]),
     ])
 
+    # --- Preprocessing MANUAL ---
+    X_train_transformed = pre.fit_transform(X_train)
+    X_holdout_transformed = pre.transform(X_holdout)
+
     # --- TPOT autoML ---
     tpot = TPOTRegressor(generations=1, population_size=20, random_state=42, max_time_mins=10)
-    pipe = Pipeline([("pre", pre), ("model", tpot)])
+    # pipe = Pipeline([("pre", pre), ("model", tpot)]) ---> NOT USING ANYMORE
 
     start = time.time()
-    pipe.fit(X_train, y_train)
+    tpot.fit(X_train_transformed, y_train)
     logging.info("Training completed in %.2f seconds", time.time() - start)
 
     # --- Holdout predictions ---
@@ -149,9 +155,9 @@ def run_once(dry_run=False):
     mape_today = None
     bias_today = None
     if not holdout_df.empty:
-        X_h = holdout_df[feats]
-        y_true = holdout_df["price_num"]
-        y_hat = pipe.predict(X_h)
+        X_h = X_holdout_transformed
+        y_true = y_holdout
+        y_hat = tpot.predict(X_h)
 
         preds_df = holdout_df[["post_id", "scraped_at", "make", "year", "mileage", "condition", "transmission", "fuel", "title_status"]].copy()
         preds_df["actual_price"] = y_true
@@ -184,11 +190,10 @@ def run_once(dry_run=False):
     preds_df.to_csv(preds_path, index=False)
 
     # --- Permutation Importance (ALL features) ---
-    X_h_transformed = pipe.named_steps['pre'].transform(X_h)
-    feature_names = pipe.named_steps['pre'].get_feature_names_out()
-    X_h_transformed_df = pd.DataFrame(X_h_transformed.toarray(), columns=feature_names)
-    best_model = pipe.named_steps['model'].fitted_pipeline_
-    result = permutation_importance(best_model, X_h_transformed.toarray(), y_true, n_repeats=20, random_state=42, scoring="neg_mean_absolute_error")
+    feature_names = pre.get_feature_names_out()
+    X_holdout_transformed_df = pd.DataFrame(X_holdout_transformed.toarray(), columns=feature_names)
+    best_model = tpot.fitted_pipeline_
+    result = permutation_importance(best_model, X_holdout_transformed.toarray(), y_holdout, n_repeats=20, random_state=42, scoring="neg_mean_absolute_error")
 
     perm_df = pd.DataFrame({
         "feature": feature_names,
@@ -209,11 +214,11 @@ def run_once(dry_run=False):
 
     # --- PDPs for top 3 features ---
     top3_idx = np.argsort(result.importances_mean)[-3:]
-    top3_features = X_h_transformed_df.columns[top3_idx]
+    top3_features = X_holdout_transformed_df.columns[top3_idx]
     pdp_paths = []
     for feat in top3_features:
         fig, ax = plt.subplots(figsize=(6, 4))
-        display = PartialDependenceDisplay.from_estimator(best_model, X_h_transformed_df, [feat], ax=ax)
+        display = PartialDependenceDisplay.from_estimator(best_model, X_holdout_transformed_df, [feat], ax=ax)
         plt.title(f'Partial Dependence Plot for {feat}')
         plt.ylabel('Predicted Price')
         plt.xlabel(feat)
@@ -225,7 +230,11 @@ def run_once(dry_run=False):
 
     # --- Save pipeline ---
     model_path = f"{base_path}/tpot_pipeline_{timestamp}.joblib"
-    joblib.dump(pipe, model_path)
+    final_pipe = Pipeline([
+        ("pre", pre),
+        ("model", best_model)
+    ])
+    joblib.dump(final_pipe, model_path)
 
     # --- upload to GCS ---
     if not dry_run:
