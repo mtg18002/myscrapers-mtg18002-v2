@@ -47,7 +47,7 @@ jobs:
           mkdir -p ${{ env.OUTPUT_DIR }}
           
           echo "Copying all files from gs://${BUCKET_NAME}/${GCS_PREDS_PREFIX}/ to local folder..."
-          gsutil -m cp -r gs://${BUCKET_NAME}/${GCS_PREDS_PREFIX}/* ${{ env.OUTPUT_DIR }}/
+          gsutil -m cp -r gs://${BUCKET_NAME}/${GCS_PREDS_PREFIX} ${{ env.OUTPUT_DIR }}/
           echo "Copy completed."
 
       # --- 3. COMMIT AND PUSH ---
@@ -58,7 +58,7 @@ jobs:
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
 
           echo "Staging all files in ${{ env.OUTPUT_DIR }}..."
-          git add ${{ env.OUTPUT_DIR }}/*
+          git add ${{ env.OUTPUT_DIR }}
 
           # Only commit if there are changes
           if ! git diff --cached --quiet; then
