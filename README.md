@@ -1,2 +1,2 @@
 # craigslist-scraper
-Let's see how good the GCP instructions are!
+Project involving scraping Craigslist car listings and using the data to predict car prices.
